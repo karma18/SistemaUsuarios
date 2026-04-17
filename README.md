@@ -2,11 +2,24 @@
 
 Aplicacion web local con frontend en React + Vite y backend en Node.js, separados en carpetas independientes.
 
+## Funcionalidades
+
+- Login de usuarios
+- Registro de cuentas
+- Recuperacion de contrasena
+- CRUD de usuarios
+- Catalogos de rol y estado
+
+## Usuario demo
+
+- Correo: `admin@empresa.local`
+- Contrasena: `Admin123*`
+
 ## Estructura
 
 ```text
 frontend/  -> interfaz React con Vite
-backend/   -> API HTTP en Node.js
+backend/   -> API HTTP en Node.js con autenticacion y usuarios
 ```
 
 ## Requisitos
@@ -52,6 +65,12 @@ npm run dev
 
 El frontend inicia en `http://localhost:5173`.
 
+## Uso rapido
+
+1. Inicia sesion con el usuario demo o crea una nueva cuenta desde la pantalla de registro.
+2. Usa la pestana de recuperacion si quieres probar el flujo de restablecimiento.
+3. Una vez dentro, administra usuarios desde el panel: crear, editar, listar y eliminar.
+
 ## Scripts disponibles
 
 ### Backend
@@ -81,4 +100,3 @@ npm test
 cd frontend
 npm run build
 ```
-

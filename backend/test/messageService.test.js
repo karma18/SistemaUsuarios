@@ -8,7 +8,7 @@ test("createHealthPayload devuelve el estado esperado", () => {
   assert.deepEqual(payload, {
     status: "ok",
     service: "backend",
-    message: "API de usuarios disponible",
+    message: "API de autenticacion y usuarios disponible",
     timestamp: "2026-04-16T00:00:00.000Z"
   });
 });
@@ -23,4 +23,3 @@ test("createHealthPayload genera un timestamp ISO cuando no se envia uno", () =>
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
   );
 });
-
