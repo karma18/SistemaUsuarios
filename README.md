@@ -7,7 +7,10 @@ Aplicacion web local con frontend en React + Vite y backend en Node.js, separado
 - Login de usuarios
 - Registro de cuentas
 - Recuperacion de contrasena
+- Dashboard inicial posterior al login
 - CRUD de usuarios
+- CRUD de clientes
+- CRUD de proveedores
 - Catalogos de rol y estado
 
 ## Usuario demo
@@ -69,7 +72,8 @@ El frontend inicia en `http://localhost:5173`.
 
 1. Inicia sesion con el usuario demo o crea una nueva cuenta desde la pantalla de registro.
 2. Usa la pestana de recuperacion si quieres probar el flujo de restablecimiento.
-3. Una vez dentro, administra usuarios desde el panel: crear, editar, listar y eliminar.
+3. Tras iniciar sesion, usa el dashboard inicial para navegar a los modulos de usuarios, clientes y proveedores.
+4. En cada modulo puedes crear, editar, listar y eliminar registros.
 
 ## Scripts disponibles
 

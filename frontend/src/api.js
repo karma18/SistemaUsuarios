@@ -64,3 +64,51 @@ export function deleteUser(userId) {
     method: "DELETE"
   });
 }
+
+export function fetchCustomers() {
+  return apiRequest("/api/customers");
+}
+
+export function createCustomer(payload) {
+  return apiRequest("/api/customers", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateCustomer(customerId, payload) {
+  return apiRequest(`/api/customers/${customerId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteCustomer(customerId) {
+  return apiRequest(`/api/customers/${customerId}`, {
+    method: "DELETE"
+  });
+}
+
+export function fetchSuppliers() {
+  return apiRequest("/api/suppliers");
+}
+
+export function createSupplier(payload) {
+  return apiRequest("/api/suppliers", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateSupplier(supplierId, payload) {
+  return apiRequest(`/api/suppliers/${supplierId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteSupplier(supplierId) {
+  return apiRequest(`/api/suppliers/${supplierId}`, {
+    method: "DELETE"
+  });
+}

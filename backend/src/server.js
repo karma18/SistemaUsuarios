@@ -1,6 +1,12 @@
 import http from "node:http";
 import { createHealthPayload } from "./messageService.js";
 import {
+  createPartyStore,
+  customerManager,
+  getPartyCatalogs,
+  supplierManager
+} from "./partyService.js";
+import {
   createUser,
   createUserStore,
   deleteUser,
@@ -15,6 +21,7 @@ import {
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
 const store = createUserStore();
+const partyStore = createPartyStore();
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -78,7 +85,10 @@ async function handleRequest(request, response) {
   }
 
   if (request.method === "GET" && pathname === "/api/catalogs") {
-    sendJson(response, 200, getUserCatalog());
+    sendJson(response, 200, {
+      ...getUserCatalog(),
+      ...getPartyCatalogs()
+    });
     return;
   }
 
@@ -121,6 +131,54 @@ async function handleRequest(request, response) {
   if (request.method === "DELETE" && pathname.startsWith("/api/users/")) {
     const userId = pathname.replace("/api/users/", "");
     sendJson(response, 200, deleteUser(store, userId));
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/customers") {
+    sendJson(response, 200, { customers: customerManager.list(partyStore) });
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/customers") {
+    const payload = await readJsonBody(request);
+    sendJson(response, 201, customerManager.create(partyStore, payload));
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/customers/")) {
+    const customerId = pathname.replace("/api/customers/", "");
+    const payload = await readJsonBody(request);
+    sendJson(response, 200, customerManager.update(partyStore, customerId, payload));
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/customers/")) {
+    const customerId = pathname.replace("/api/customers/", "");
+    sendJson(response, 200, customerManager.remove(partyStore, customerId));
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/suppliers") {
+    sendJson(response, 200, { suppliers: supplierManager.list(partyStore) });
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/suppliers") {
+    const payload = await readJsonBody(request);
+    sendJson(response, 201, supplierManager.create(partyStore, payload));
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/suppliers/")) {
+    const supplierId = pathname.replace("/api/suppliers/", "");
+    const payload = await readJsonBody(request);
+    sendJson(response, 200, supplierManager.update(partyStore, supplierId, payload));
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/suppliers/")) {
+    const supplierId = pathname.replace("/api/suppliers/", "");
+    sendJson(response, 200, supplierManager.remove(partyStore, supplierId));
     return;
   }
 
