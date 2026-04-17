@@ -1,15 +1,55 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  createPartyStore,
   customerManager,
+  ensurePartySeeds,
   supplierManager
 } from "../src/partyService.js";
 
-test("customerManager crea y lista clientes", () => {
-  const store = createPartyStore();
+function createPartyRepository(initialItems = []) {
+  const items = initialItems.map((item) => ({ ...item }));
 
-  const result = customerManager.create(store, {
+  return {
+    items,
+    async findByEmail(email) {
+      return items.find((item) => item.email === email) || null;
+    },
+    async findById(id) {
+      return items.find((item) => item.id === id) || null;
+    },
+    async list() {
+      return items.map((item) => ({ ...item }));
+    },
+    async create(item) {
+      items.push({ ...item });
+      return item;
+    },
+    async update(updatedItem) {
+      const index = items.findIndex((item) => item.id === updatedItem.id);
+      items[index] = { ...updatedItem };
+      return updatedItem;
+    },
+    async delete(id) {
+      const index = items.findIndex((item) => item.id === id);
+      items.splice(index, 1);
+    }
+  };
+}
+
+test("ensurePartySeeds registra cliente y proveedor base", async () => {
+  const customerRepository = createPartyRepository([]);
+  const supplierRepository = createPartyRepository([]);
+
+  await ensurePartySeeds(customerRepository, supplierRepository);
+
+  assert.equal(customerRepository.items.length, 1);
+  assert.equal(supplierRepository.items.length, 1);
+});
+
+test("customerManager crea y lista clientes", async () => {
+  const repository = createPartyRepository([]);
+
+  const result = await customerManager.create(repository, {
     name: "Industrias Nova",
     email: "contacto@nova.local",
     phone: "+52 55 9999 8888",
@@ -19,15 +59,27 @@ test("customerManager crea y lista clientes", () => {
   });
 
   assert.equal(result.item.segment, "PyME");
-  assert.equal(customerManager.list(store).length, 2);
+  assert.equal((await customerManager.list(repository)).length, 1);
 });
 
-test("customerManager rechaza correos duplicados", () => {
-  const store = createPartyStore();
+test("customerManager rechaza correos duplicados", async () => {
+  const repository = createPartyRepository([
+    {
+      id: "1",
+      name: "Grupo Horizonte",
+      email: "contacto@horizonte.local",
+      phone: "+52 55 1111 2222",
+      city: "Ciudad de Mexico",
+      segment: "Corporativo",
+      status: "Activo",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ]);
 
-  assert.throws(
+  await assert.rejects(
     () =>
-      customerManager.create(store, {
+      customerManager.create(repository, {
         name: "Nuevo Cliente",
         email: "contacto@horizonte.local",
         phone: "+52 55 9999 7777",
@@ -39,11 +91,22 @@ test("customerManager rechaza correos duplicados", () => {
   );
 });
 
-test("customerManager actualiza clientes existentes", () => {
-  const store = createPartyStore();
-  const [customer] = customerManager.list(store);
+test("customerManager actualiza clientes existentes", async () => {
+  const repository = createPartyRepository([
+    {
+      id: "1",
+      name: "Grupo Horizonte",
+      email: "contacto@horizonte.local",
+      phone: "+52 55 1111 2222",
+      city: "Ciudad de Mexico",
+      segment: "Corporativo",
+      status: "Activo",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ]);
 
-  const result = customerManager.update(store, customer.id, {
+  const result = await customerManager.update(repository, "1", {
     city: "Guadalajara",
     segment: "PyME",
     status: "Inactivo"
@@ -54,10 +117,10 @@ test("customerManager actualiza clientes existentes", () => {
   assert.equal(result.item.status, "Inactivo");
 });
 
-test("supplierManager crea y elimina proveedores", () => {
-  const store = createPartyStore();
+test("supplierManager crea y elimina proveedores", async () => {
+  const repository = createPartyRepository([]);
 
-  const created = supplierManager.create(store, {
+  const created = await supplierManager.create(repository, {
     name: "Logistica Norte",
     email: "contacto@norte.local",
     phone: "+52 81 7777 1111",
@@ -66,21 +129,21 @@ test("supplierManager crea y elimina proveedores", () => {
     status: "Activo"
   });
 
-  const deleted = supplierManager.remove(store, created.item.id);
+  const deleted = await supplierManager.remove(repository, created.item.id);
 
   assert.equal(
     deleted.message,
     "proveedor Logistica Norte eliminado correctamente."
   );
-  assert.equal(supplierManager.list(store).length, 1);
+  assert.equal((await supplierManager.list(repository)).length, 0);
 });
 
-test("supplierManager valida categorias invalidas como edge case", () => {
-  const store = createPartyStore();
+test("supplierManager valida categorias invalidas como edge case", async () => {
+  const repository = createPartyRepository([]);
 
-  assert.throws(
+  await assert.rejects(
     () =>
-      supplierManager.create(store, {
+      supplierManager.create(repository, {
         name: "Proveedor X",
         email: "x@local.local",
         phone: "+52 81 1212 3434",

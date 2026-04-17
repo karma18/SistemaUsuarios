@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { hashPassword, verifyPassword } from "./security.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALLOWED_ROLES = ["Administrador", "Analista", "Soporte"];
@@ -33,7 +34,7 @@ function createSeedUser() {
     id: randomUUID(),
     name: "Administrador General",
     email: "admin@empresa.local",
-    password: "Admin123*",
+    passwordHash: hashPassword("Admin123*"),
     role: "Administrador",
     department: "Tecnologia",
     status: "Activo",
@@ -101,12 +102,6 @@ function buildError(message, statusCode = 400) {
   return error;
 }
 
-export function createUserStore(seedUsers = [createSeedUser()]) {
-  return {
-    users: seedUsers.map((user) => ({ ...user }))
-  };
-}
-
 export function getUserCatalog() {
   return {
     roles: [...ALLOWED_ROLES],
@@ -114,7 +109,15 @@ export function getUserCatalog() {
   };
 }
 
-export function loginUser(store, payload) {
+export async function ensureUserSeeds(userRepository) {
+  const existingUser = await userRepository.findByEmail("admin@empresa.local");
+
+  if (!existingUser) {
+    await userRepository.create(createSeedUser());
+  }
+}
+
+export async function loginUser(userRepository, payload) {
   const email = normalizeEmail(payload?.email);
   const password = normalizeText(payload?.password);
   const emailError = validateEmail(email);
@@ -128,9 +131,9 @@ export function loginUser(store, payload) {
     throw buildError(passwordError);
   }
 
-  const user = store.users.find((item) => item.email === email);
+  const user = await userRepository.findByEmail(email);
 
-  if (!user || user.password !== password) {
+  if (!user || !verifyPassword(password, user.passwordHash)) {
     throw buildError("Credenciales invalidas.", 401);
   }
 
@@ -138,16 +141,21 @@ export function loginUser(store, payload) {
     throw buildError("El usuario se encuentra inactivo.", 403);
   }
 
-  user.lastLoginAt = new Date().toISOString();
-  user.updatedAt = user.lastLoginAt;
+  const updatedUser = {
+    ...user,
+    lastLoginAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  await userRepository.update(updatedUser);
 
   return {
     message: `Bienvenido, ${user.name}.`,
-    user: sanitizeUser(user)
+    user: sanitizeUser(updatedUser)
   };
 }
 
-export function registerUser(store, payload) {
+export async function registerUser(userRepository, payload) {
   const name = normalizeText(payload?.name);
   const email = normalizeEmail(payload?.email);
   const password = normalizeText(payload?.password);
@@ -168,7 +176,9 @@ export function registerUser(store, payload) {
     throw buildError(passwordError);
   }
 
-  if (store.users.some((user) => user.email === email)) {
+  const existingUser = await userRepository.findByEmail(email);
+
+  if (existingUser) {
     throw buildError("Ya existe un usuario registrado con ese correo.", 409);
   }
 
@@ -177,7 +187,7 @@ export function registerUser(store, payload) {
     id: randomUUID(),
     name,
     email,
-    password,
+    passwordHash: hashPassword(password),
     role: "Analista",
     department,
     status: "Activo",
@@ -186,7 +196,7 @@ export function registerUser(store, payload) {
     updatedAt: now
   };
 
-  store.users.push(user);
+  await userRepository.create(user);
 
   return {
     message: "Registro completado correctamente.",
@@ -194,7 +204,7 @@ export function registerUser(store, payload) {
   };
 }
 
-export function requestPasswordReset(store, payload) {
+export async function requestPasswordReset(userRepository, payload) {
   const email = normalizeEmail(payload?.email);
   const emailError = validateEmail(email);
 
@@ -202,13 +212,16 @@ export function requestPasswordReset(store, payload) {
     throw buildError(emailError);
   }
 
-  const user = store.users.find((item) => item.email === email);
+  const user = await userRepository.findByEmail(email);
 
   if (!user) {
     throw buildError("No existe una cuenta asociada al correo indicado.", 404);
   }
 
-  user.updatedAt = new Date().toISOString();
+  await userRepository.update({
+    ...user,
+    updatedAt: new Date().toISOString()
+  });
 
   return {
     message:
@@ -216,11 +229,12 @@ export function requestPasswordReset(store, payload) {
   };
 }
 
-export function listUsers(store) {
-  return store.users.map(sanitizeUser);
+export async function listUsers(userRepository) {
+  const users = await userRepository.list();
+  return users.map(sanitizeUser);
 }
 
-export function createUser(store, payload) {
+export async function createUser(userRepository, payload) {
   const name = normalizeText(payload?.name);
   const email = normalizeEmail(payload?.email);
   const password = normalizeText(payload?.password);
@@ -240,7 +254,9 @@ export function createUser(store, payload) {
     );
   }
 
-  if (store.users.some((user) => user.email === email)) {
+  const existingUser = await userRepository.findByEmail(email);
+
+  if (existingUser) {
     throw buildError("Ya existe un usuario registrado con ese correo.", 409);
   }
 
@@ -249,7 +265,7 @@ export function createUser(store, payload) {
     id: randomUUID(),
     name,
     email,
-    password,
+    passwordHash: hashPassword(password),
     role,
     department,
     status,
@@ -258,7 +274,7 @@ export function createUser(store, payload) {
     updatedAt: now
   };
 
-  store.users.push(user);
+  await userRepository.create(user);
 
   return {
     message: "Usuario creado correctamente.",
@@ -266,8 +282,8 @@ export function createUser(store, payload) {
   };
 }
 
-export function updateUser(store, userId, payload) {
-  const user = store.users.find((item) => item.id === userId);
+export async function updateUser(userRepository, userId, payload) {
+  const user = await userRepository.findById(userId);
 
   if (!user) {
     throw buildError("Usuario no encontrado.", 404);
@@ -297,39 +313,39 @@ export function updateUser(store, userId, payload) {
     throw buildError(nameError || emailError || roleError || statusError);
   }
 
-  const emailInUse = store.users.some(
-    (item) => item.id !== userId && item.email === email
-  );
+  const existingUser = await userRepository.findByEmail(email);
 
-  if (emailInUse) {
+  if (existingUser && existingUser.id !== userId) {
     throw buildError("Ya existe un usuario registrado con ese correo.", 409);
   }
 
-  user.name = name;
-  user.email = email;
-  user.role = role;
-  user.department = department;
-  user.status = status;
-  user.updatedAt = new Date().toISOString();
+  const updatedUser = {
+    ...user,
+    name,
+    email,
+    role,
+    department,
+    status,
+    passwordHash: newPassword ? hashPassword(newPassword) : user.passwordHash,
+    updatedAt: new Date().toISOString()
+  };
 
-  if (newPassword) {
-    user.password = newPassword;
-  }
+  await userRepository.update(updatedUser);
 
   return {
     message: "Usuario actualizado correctamente.",
-    user: sanitizeUser(user)
+    user: sanitizeUser(updatedUser)
   };
 }
 
-export function deleteUser(store, userId) {
-  const index = store.users.findIndex((item) => item.id === userId);
+export async function deleteUser(userRepository, userId) {
+  const user = await userRepository.findById(userId);
 
-  if (index === -1) {
+  if (!user) {
     throw buildError("Usuario no encontrado.", 404);
   }
 
-  const [user] = store.users.splice(index, 1);
+  await userRepository.delete(userId);
 
   return {
     message: `Usuario ${user.name} eliminado correctamente.`

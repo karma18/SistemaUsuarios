@@ -1,15 +1,22 @@
 import http from "node:http";
+import { getServerConfig } from "./config.js";
+import { createPool } from "./db.js";
 import { createHealthPayload } from "./messageService.js";
 import {
-  createPartyStore,
+  createCustomerRepository,
+  createSupplierRepository
+} from "./repositories/partyRepository.js";
+import { createUserRepository } from "./repositories/userRepository.js";
+import {
   customerManager,
+  ensurePartySeeds,
   getPartyCatalogs,
   supplierManager
 } from "./partyService.js";
 import {
   createUser,
-  createUserStore,
   deleteUser,
+  ensureUserSeeds,
   getUserCatalog,
   listUsers,
   loginUser,
@@ -18,10 +25,11 @@ import {
   updateUser
 } from "./userService.js";
 
-const PORT = Number(process.env.PORT) || 3001;
-const HOST = process.env.HOST || "0.0.0.0";
-const store = createUserStore();
-const partyStore = createPartyStore();
+const { port: PORT, host: HOST } = getServerConfig();
+const pool = createPool();
+const userRepository = createUserRepository(pool);
+const customerRepository = createCustomerRepository(pool);
+const supplierRepository = createSupplierRepository(pool);
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -94,91 +102,111 @@ async function handleRequest(request, response) {
 
   if (request.method === "POST" && pathname === "/api/auth/login") {
     const payload = await readJsonBody(request);
-    sendJson(response, 200, loginUser(store, payload));
+    sendJson(response, 200, await loginUser(userRepository, payload));
     return;
   }
 
   if (request.method === "POST" && pathname === "/api/auth/register") {
     const payload = await readJsonBody(request);
-    sendJson(response, 201, registerUser(store, payload));
+    sendJson(response, 201, await registerUser(userRepository, payload));
     return;
   }
 
   if (request.method === "POST" && pathname === "/api/auth/forgot-password") {
     const payload = await readJsonBody(request);
-    sendJson(response, 200, requestPasswordReset(store, payload));
+    sendJson(response, 200, await requestPasswordReset(userRepository, payload));
     return;
   }
 
   if (request.method === "GET" && pathname === "/api/users") {
-    sendJson(response, 200, { users: listUsers(store) });
+    sendJson(response, 200, { users: await listUsers(userRepository) });
     return;
   }
 
   if (request.method === "POST" && pathname === "/api/users") {
     const payload = await readJsonBody(request);
-    sendJson(response, 201, createUser(store, payload));
+    sendJson(response, 201, await createUser(userRepository, payload));
     return;
   }
 
   if (request.method === "PUT" && pathname.startsWith("/api/users/")) {
     const userId = pathname.replace("/api/users/", "");
     const payload = await readJsonBody(request);
-    sendJson(response, 200, updateUser(store, userId, payload));
+    sendJson(response, 200, await updateUser(userRepository, userId, payload));
     return;
   }
 
   if (request.method === "DELETE" && pathname.startsWith("/api/users/")) {
     const userId = pathname.replace("/api/users/", "");
-    sendJson(response, 200, deleteUser(store, userId));
+    sendJson(response, 200, await deleteUser(userRepository, userId));
     return;
   }
 
   if (request.method === "GET" && pathname === "/api/customers") {
-    sendJson(response, 200, { customers: customerManager.list(partyStore) });
+    sendJson(response, 200, {
+      customers: await customerManager.list(customerRepository)
+    });
     return;
   }
 
   if (request.method === "POST" && pathname === "/api/customers") {
     const payload = await readJsonBody(request);
-    sendJson(response, 201, customerManager.create(partyStore, payload));
+    sendJson(response, 201, await customerManager.create(customerRepository, payload));
     return;
   }
 
   if (request.method === "PUT" && pathname.startsWith("/api/customers/")) {
     const customerId = pathname.replace("/api/customers/", "");
     const payload = await readJsonBody(request);
-    sendJson(response, 200, customerManager.update(partyStore, customerId, payload));
+    sendJson(
+      response,
+      200,
+      await customerManager.update(customerRepository, customerId, payload)
+    );
     return;
   }
 
   if (request.method === "DELETE" && pathname.startsWith("/api/customers/")) {
     const customerId = pathname.replace("/api/customers/", "");
-    sendJson(response, 200, customerManager.remove(partyStore, customerId));
+    sendJson(
+      response,
+      200,
+      await customerManager.remove(customerRepository, customerId)
+    );
     return;
   }
 
   if (request.method === "GET" && pathname === "/api/suppliers") {
-    sendJson(response, 200, { suppliers: supplierManager.list(partyStore) });
+    sendJson(response, 200, {
+      suppliers: await supplierManager.list(supplierRepository)
+    });
     return;
   }
 
   if (request.method === "POST" && pathname === "/api/suppliers") {
     const payload = await readJsonBody(request);
-    sendJson(response, 201, supplierManager.create(partyStore, payload));
+    sendJson(response, 201, await supplierManager.create(supplierRepository, payload));
     return;
   }
 
   if (request.method === "PUT" && pathname.startsWith("/api/suppliers/")) {
     const supplierId = pathname.replace("/api/suppliers/", "");
     const payload = await readJsonBody(request);
-    sendJson(response, 200, supplierManager.update(partyStore, supplierId, payload));
+    sendJson(
+      response,
+      200,
+      await supplierManager.update(supplierRepository, supplierId, payload)
+    );
     return;
   }
 
   if (request.method === "DELETE" && pathname.startsWith("/api/suppliers/")) {
     const supplierId = pathname.replace("/api/suppliers/", "");
-    sendJson(response, 200, supplierManager.remove(partyStore, supplierId));
+    sendJson(
+      response,
+      200,
+      await supplierManager.remove(supplierRepository, supplierId)
+    );
     return;
   }
 
@@ -200,6 +228,9 @@ const server = http.createServer(async (request, response) => {
     });
   }
 });
+
+await ensureUserSeeds(userRepository);
+await ensurePartySeeds(customerRepository, supplierRepository);
 
 server.listen(PORT, HOST, () => {
   console.log(

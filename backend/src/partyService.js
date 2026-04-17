@@ -122,13 +122,6 @@ function createSeedSuppliers() {
   ];
 }
 
-export function createPartyStore() {
-  return {
-    customers: createSeedCustomers(),
-    suppliers: createSeedSuppliers()
-  };
-}
-
 export function getPartyCatalogs() {
   return {
     statuses: [...ALLOWED_STATUSES],
@@ -137,18 +130,28 @@ export function getPartyCatalogs() {
   };
 }
 
-function createPartyManager({
-  storeKey,
-  typeKey,
-  label,
-  allowedValues,
-  optionFieldLabel
-}) {
-  function list(store) {
-    return store[storeKey].map((item) => sanitizeParty(item, typeKey));
+export async function ensurePartySeeds(customerRepository, supplierRepository) {
+  const customerSeed = createSeedCustomers()[0];
+  const supplierSeed = createSeedSuppliers()[0];
+  const existingCustomer = await customerRepository.findByEmail(customerSeed.email);
+  const existingSupplier = await supplierRepository.findByEmail(supplierSeed.email);
+
+  if (!existingCustomer) {
+    await customerRepository.create(customerSeed);
   }
 
-  function create(store, payload) {
+  if (!existingSupplier) {
+    await supplierRepository.create(supplierSeed);
+  }
+}
+
+function createPartyManager({ typeKey, label, allowedValues, optionFieldLabel }) {
+  async function list(repository) {
+    const items = await repository.list();
+    return items.map((item) => sanitizeParty(item, typeKey));
+  }
+
+  async function create(repository, payload) {
     const name = normalizeText(payload?.name);
     const email = normalizeEmail(payload?.email);
     const phone = normalizeText(payload?.phone);
@@ -168,12 +171,14 @@ function createPartyManager({
       );
     }
 
-    if (store[storeKey].some((item) => item.email === email)) {
+    const existingItem = await repository.findByEmail(email);
+
+    if (existingItem) {
       throw buildError(`Ya existe un ${label} registrado con ese correo.`, 409);
     }
 
     const now = new Date().toISOString();
-    const party = {
+    const item = {
       id: randomUUID(),
       name,
       email,
@@ -185,27 +190,27 @@ function createPartyManager({
       updatedAt: now
     };
 
-    store[storeKey].push(party);
+    await repository.create(item);
 
     return {
       message: `${label} creado correctamente.`,
-      item: sanitizeParty(party, typeKey)
+      item: sanitizeParty(item, typeKey)
     };
   }
 
-  function update(store, partyId, payload) {
-    const party = store[storeKey].find((item) => item.id === partyId);
+  async function update(repository, partyId, payload) {
+    const currentItem = await repository.findById(partyId);
 
-    if (!party) {
+    if (!currentItem) {
       throw buildError(`${label} no encontrado.`, 404);
     }
 
-    const name = normalizeText(payload?.name || party.name);
-    const email = normalizeEmail(payload?.email || party.email);
-    const phone = normalizeText(payload?.phone || party.phone);
-    const city = normalizeText(payload?.city || party.city);
-    const status = normalizeText(payload?.status || party.status);
-    const typeValue = normalizeText(payload?.[typeKey] || party[typeKey]);
+    const name = normalizeText(payload?.name || currentItem.name);
+    const email = normalizeEmail(payload?.email || currentItem.email);
+    const phone = normalizeText(payload?.phone || currentItem.phone);
+    const city = normalizeText(payload?.city || currentItem.city);
+    const status = normalizeText(payload?.status || currentItem.status);
+    const typeValue = normalizeText(payload?.[typeKey] || currentItem[typeKey]);
 
     const nameError = validateName(name, label);
     const emailError = validateEmail(email, label);
@@ -219,52 +224,49 @@ function createPartyManager({
       );
     }
 
-    const emailInUse = store[storeKey].some(
-      (item) => item.id !== partyId && item.email === email
-    );
+    const existingItem = await repository.findByEmail(email);
 
-    if (emailInUse) {
+    if (existingItem && existingItem.id !== partyId) {
       throw buildError(`Ya existe un ${label} registrado con ese correo.`, 409);
     }
 
-    party.name = name;
-    party.email = email;
-    party.phone = phone;
-    party.city = city;
-    party.status = status;
-    party[typeKey] = typeValue;
-    party.updatedAt = new Date().toISOString();
+    const updatedItem = {
+      ...currentItem,
+      name,
+      email,
+      phone,
+      city,
+      status,
+      [typeKey]: typeValue,
+      updatedAt: new Date().toISOString()
+    };
+
+    await repository.update(updatedItem);
 
     return {
       message: `${label} actualizado correctamente.`,
-      item: sanitizeParty(party, typeKey)
+      item: sanitizeParty(updatedItem, typeKey)
     };
   }
 
-  function remove(store, partyId) {
-    const index = store[storeKey].findIndex((item) => item.id === partyId);
+  async function remove(repository, partyId) {
+    const currentItem = await repository.findById(partyId);
 
-    if (index === -1) {
+    if (!currentItem) {
       throw buildError(`${label} no encontrado.`, 404);
     }
 
-    const [party] = store[storeKey].splice(index, 1);
+    await repository.delete(partyId);
 
     return {
-      message: `${label} ${party.name} eliminado correctamente.`
+      message: `${label} ${currentItem.name} eliminado correctamente.`
     };
   }
 
-  return {
-    list,
-    create,
-    update,
-    remove
-  };
+  return { list, create, update, remove };
 }
 
 export const customerManager = createPartyManager({
-  storeKey: "customers",
   typeKey: "segment",
   label: "cliente",
   allowedValues: CUSTOMER_SEGMENTS,
@@ -272,7 +274,6 @@ export const customerManager = createPartyManager({
 });
 
 export const supplierManager = createPartyManager({
-  storeKey: "suppliers",
   typeKey: "category",
   label: "proveedor",
   allowedValues: SUPPLIER_CATEGORIES,

@@ -1,0 +1,45 @@
+CREATE DATABASE IF NOT EXISTS __DB_NAME__
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE __DB_NAME__;
+
+CREATE TABLE IF NOT EXISTS users (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(150) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL,
+  department VARCHAR(100) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  last_login_at DATETIME NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  CONSTRAINT uq_users_email UNIQUE (email)
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(150) NOT NULL,
+  phone VARCHAR(30) NOT NULL,
+  city VARCHAR(100) NOT NULL,
+  segment VARCHAR(50) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  CONSTRAINT uq_customers_email UNIQUE (email)
+);
+
+CREATE TABLE IF NOT EXISTS suppliers (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(150) NOT NULL,
+  phone VARCHAR(30) NOT NULL,
+  city VARCHAR(100) NOT NULL,
+  category VARCHAR(50) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  CONSTRAINT uq_suppliers_email UNIQUE (email)
+);
