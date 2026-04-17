@@ -1,3 +1,5 @@
+import { fromMysqlDateTime, toMysqlDateTime } from "./dateMapper.js";
+
 function mapUser(row) {
   return {
     id: row.id,
@@ -7,9 +9,9 @@ function mapUser(row) {
     role: row.role,
     department: row.department,
     status: row.status,
-    lastLoginAt: row.last_login_at ? new Date(row.last_login_at).toISOString() : null,
-    createdAt: new Date(row.created_at).toISOString(),
-    updatedAt: new Date(row.updated_at).toISOString()
+    lastLoginAt: fromMysqlDateTime(row.last_login_at),
+    createdAt: fromMysqlDateTime(row.created_at),
+    updatedAt: fromMysqlDateTime(row.updated_at)
   };
 }
 
@@ -64,9 +66,9 @@ export function createUserRepository(pool) {
           user.role,
           user.department,
           user.status,
-          user.lastLoginAt,
-          user.createdAt,
-          user.updatedAt
+          toMysqlDateTime(user.lastLoginAt),
+          toMysqlDateTime(user.createdAt),
+          toMysqlDateTime(user.updatedAt)
         ]
       );
 
@@ -86,8 +88,8 @@ export function createUserRepository(pool) {
           user.role,
           user.department,
           user.status,
-          user.lastLoginAt,
-          user.updatedAt,
+          toMysqlDateTime(user.lastLoginAt),
+          toMysqlDateTime(user.updatedAt),
           user.id
         ]
       );

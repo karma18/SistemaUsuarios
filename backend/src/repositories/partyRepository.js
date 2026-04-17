@@ -1,3 +1,5 @@
+import { fromMysqlDateTime, toMysqlDateTime } from "./dateMapper.js";
+
 function mapParty(row, typeKey) {
   return {
     id: row.id,
@@ -6,8 +8,8 @@ function mapParty(row, typeKey) {
     phone: row.phone,
     city: row.city,
     status: row.status,
-    createdAt: new Date(row.created_at).toISOString(),
-    updatedAt: new Date(row.updated_at).toISOString(),
+    createdAt: fromMysqlDateTime(row.created_at),
+    updatedAt: fromMysqlDateTime(row.updated_at),
     [typeKey]: row[typeKey]
   };
 }
@@ -62,8 +64,8 @@ function createPartyRepository(pool, tableName, typeKey) {
           item.city,
           item[typeKey],
           item.status,
-          item.createdAt,
-          item.updatedAt
+          toMysqlDateTime(item.createdAt),
+          toMysqlDateTime(item.updatedAt)
         ]
       );
 
@@ -83,7 +85,7 @@ function createPartyRepository(pool, tableName, typeKey) {
           item.city,
           item[typeKey],
           item.status,
-          item.updatedAt,
+          toMysqlDateTime(item.updatedAt),
           item.id
         ]
       );
